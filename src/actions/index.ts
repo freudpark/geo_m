@@ -2,13 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { Target, LogResult } from '../lib/db';
-import { mockDB } from '../lib/db/mock';
-
-interface DashboardTarget extends Target {
-    latestLog?: LogResult;
-}
-
 import { getRequestContext } from '@cloudflare/next-on-pages';
+
+// DYNAMIC IMPORT for mockDB to avoid Edge Runtime crash in production
+// import { mockDB } from '../lib/db/mock'; 
 
 function getDB() {
     // 1. Try getRequestContext (Standard for Pages Plugin)
@@ -26,14 +23,20 @@ function getDB() {
         return process.env.DB as unknown as D1Database;
     }
 
-    // 3. Local Development -> Use Mock DB
+    // 3. Local Development -> Use Mock DB (Dynamic Import)
     if (process.env.NODE_ENV === 'development') {
-        return mockDB as unknown as D1Database;
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const { mockDB } = require('../lib/db/mock');
+            return mockDB as unknown as D1Database;
+        } catch (e) {
+            console.warn("Failed to load mockDB:", e);
+        }
     }
 
     // 4. Production but no DB -> Throw Error (Don't use MockDB which crashes Edge)
     console.error("CRITICAL ERROR: D1 Database binding 'DB' is missing.");
-    throw new Error("Database binding not found. Please check Cloudflare Pages settings.");
+    throw new Error("Database binding not found. Please check Cloudflare Pages Settings - Bindings.");
 }
 
 export async function getDashboardData(): Promise<DashboardTarget[]> {
