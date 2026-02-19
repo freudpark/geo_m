@@ -9,23 +9,18 @@ interface DashboardTarget extends Target {
 }
 
 function getDB() {
-    try {
-        // Vercel / Local Development -> Use Mock DB
-        // Cloudflare Pages -> Use D1
-        if (process.env.NODE_ENV === 'development' || !process.env.DB) {
-            // In Vercel, we don't have D1 binding unless configured.
-            // For now, fall back to Mock DB to allow deployment.
-            // If user wants persistence on Vercel, they need Postgres/KV.
-            return mockDB as unknown as D1Database;
-        }
-
-        // Dynamic import to avoid build error on Vercel/Next.js 16
-        // This part will only work if @cloudflare/next-on-pages is present and compatible
-        // But since we are removing it to fix build, we must strictly use MockDB or another adapter.
-        return mockDB as unknown as D1Database;
-    } catch (e) {
+    // Local Development -> Use Mock DB
+    if (process.env.NODE_ENV === 'development') {
         return mockDB as unknown as D1Database;
     }
+
+    // Cloudflare Pages -> Use D1
+    if (process.env.DB) {
+        return process.env.DB as unknown as D1Database;
+    }
+
+    // Fallback (Build time or misconfiguration)
+    return mockDB as unknown as D1Database;
 }
 
 export async function getDashboardData(): Promise<DashboardTarget[]> {

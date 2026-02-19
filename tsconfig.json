@@ -22,11 +22,14 @@
         "name": "next"
       }
     ],
+    "types": [
+      "@cloudflare/workers-types"
+    ],
     "paths": {
       "@/*": [
         "./src/*"
       ]
-    },
+    }
   },
   "include": [
     "next-env.d.ts",
