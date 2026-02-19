@@ -27,7 +27,16 @@
    npm run dev
    ```
 
-## 배포
+## 배포 (Vercel)
+
+1. **GitHub Repository 연결**: Vercel 대시보드에서 `freudpark/geo_m` 레포지토리를 import 합니다.
+2. **Framework Preset**: `Next.js`가 자동 선택됩니다.
+3. **Environment Variables**:
+   - **중요**: 공공기관 사이트(오래된 SSL 인증서 사용) 점검을 위해 아래 변수를 반드시 설정해야 합니다.
+   - `NODE_TLS_REJECT_UNAUTHORIZED`: `0`
+4. **Deploy**: `Deploy` 버튼을 눌러 배포를 완료합니다.
+
+## (참고) 이전 배포 방식
 Cloudflare Pages에 배포됩니다.
 ```bash
 npx wrangler pages deploy .vercel/output/static --project-name edumonitor
