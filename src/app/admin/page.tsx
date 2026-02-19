@@ -4,7 +4,7 @@ import DeleteAllButton from '@/components/admin/DeleteAllButton';
 import { getAllTargets } from '@/actions';
 import { Activity, ExternalLink } from 'lucide-react';
 
-// export const runtime = 'edge'; // Disabled for local file-based mock DB persistence
+export const runtime = 'edge'; // Enabled for Cloudflare Pages
 
 export default async function AdminPage() {
     const targets = await getAllTargets();

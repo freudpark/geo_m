@@ -3,7 +3,7 @@ import { MonitoringTable } from '@/components/ui/MonitoringTable';
 import { Activity } from 'lucide-react';
 import AdminButton from '@/components/ui/AdminButton';
 
-// export const runtime = 'edge'; // Disabled for local file-based mock DB persistence
+export const runtime = 'edge'; // Enabled for Cloudflare Pages
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
