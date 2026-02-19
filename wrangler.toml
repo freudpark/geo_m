@@ -14,3 +14,6 @@ crons = ["*/5 * * * *"] # Run every 5 minutes
 # [Observability]
 [observability]
 enabled = true
+
+[site]
+bucket = ".vercel/output/static"
