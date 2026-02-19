@@ -6,28 +6,40 @@ let fs: any;
 let path: any;
 let DB_PATH = '';
 
-try {
-    if (typeof window === 'undefined') {
-        fs = require('fs');
-        path = require('path');
-        DB_PATH = path.join(process.cwd(), 'mock-db.json');
-        console.log('[MockDB] DB Path resolved to:', DB_PATH);
+// Helper to lazy load Node.js modules
+function ensureNodeEnv() {
+    if (process.env.NODE_ENV !== 'development') return false;
+    try {
+        if (!fs) {
+            fs = require('fs');
+            path = require('path');
+            DB_PATH = path.join(process.cwd(), 'mock-db.json');
+            console.log('[MockDB] DB Path resolved to:', DB_PATH);
+        }
+        return true;
+    } catch (e) {
+        console.warn('[MockDB] Failed to load Node modules:', e);
+        return false;
     }
-} catch (e) {
-    console.warn('[MockDB] FS not available (likely Edge runtime)');
 }
 
 const DEFAULT_TARGETS: Target[] = [];
 
 function loadDB(): Target[] {
-    if (!fs) {
-        console.warn('[MockDB] FS module not loaded, returning empty defaults');
+    if (!ensureNodeEnv()) {
+        if (process.env.NODE_ENV === 'development') {
+            console.warn('[MockDB] Node environment check failed or not in dev');
+        }
         return DEFAULT_TARGETS;
     }
+
     try {
         if (!fs.existsSync(DB_PATH)) {
             console.log('[MockDB] DB file does not exist, creating new one.');
-            saveDB(DEFAULT_TARGETS);
+            // Avoid infinite loop if saveDB also fails
+            if (fs) {
+                fs.writeFileSync(DB_PATH, JSON.stringify(DEFAULT_TARGETS, null, 2), 'utf-8');
+            }
             return DEFAULT_TARGETS;
         }
         const data = fs.readFileSync(DB_PATH, 'utf-8');
@@ -41,7 +53,7 @@ function loadDB(): Target[] {
 }
 
 function saveDB(data: Target[]) {
-    if (!fs) return;
+    if (!ensureNodeEnv()) return;
     try {
         console.log(`[MockDB] Saving ${data.length} targets to disk...`);
         fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
