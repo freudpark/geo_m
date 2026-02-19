@@ -92,65 +92,84 @@ export async function checkTarget(target: Target): Promise<{ status: number; lat
 
             if (shouldRetry) {
                 // Strategy 2: Legacy/Curl Headers
-                // Simple headers for old Apache/Tomcat servers that choke on large headers (e.g. goese.kr)
                 const legacyHeaders = {
                     'User-Agent': 'curl/8.16.0',
                     'Accept': '*/*'
                 };
 
-                // Retry!
                 status = await performRequest(legacyHeaders, 15000);
             } else {
-                throw err; // Real error (e.g. timeout on modern headers), rethrow
+                throw err;
             }
+        } catch (err: any) {
+            // Strategy 3: Auto-WWW Retry (for DNS errors)
+            // If domain resolution fails (ENOTFOUND) and url doesn't start with www, try adding it.
+            // Many Korean gov sites only map www (e.g. goemec.kr -> FAIL, www.goemec.kr -> OK)
+            const code = (err.code || '').toUpperCase();
+            if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') {
+                const urlObj = new URL(target.url);
+                if (!urlObj.hostname.startsWith('www.')) {
+                    // Construct new URL with www
+                    const newUrl = `${urlObj.protocol}//www.${urlObj.hostname}${urlObj.pathname}${urlObj.search}`;
+                    // console.log(`[Auto-WWW] Retrying ${target.url} as ${newUrl}`);
+
+                    // Temporarily update target URL for this request context only
+                    const newTarget = { ...target, url: newUrl };
+
+                    // Retry with Modern Headers first
+                    return checkTarget(newTarget);
+                }
+            }
+            throw err;
         }
+    }
 
         // Evaluate Status
         // Allow 2xx and 3xx (Redirects are OK)
         if (status >= 200 && status < 400) {
-            result = 'OK';
-        } else {
-            // Precise Error Mapping
-            if (status === 404) result = 'FAIL:페이지 없음 (404)';
-            else if (status === 500) result = 'FAIL:서버 오류 (500)';
-            else if (status === 502) result = 'FAIL:게이트웨이 오류 (502)';
-            else if (status === 503) result = 'FAIL:서비스 점검 중 (503)';
-            else if (status === 504) result = 'FAIL:응답 시간 초과 (504)';
-            else if (status === 403) result = 'FAIL:접근 권한 없음 (403)';
-            else if (status === 400) result = 'FAIL:잘못된 요청 (400)';
-            else result = `FAIL:HTTP 오류 (${status})`;
-        }
-
-    } catch (err: any) {
-        // Map network errors
-        let reason = '접속 불가';
-        const msg = (err.message || '').toLowerCase();
-        const code = (err.code || '').toUpperCase();
-
-        if (code === 'ETIMEDOUT') reason = '시간 초과';
-        else if (msg.includes('socket hang up')) reason = '서버 연결 끊김';
-        else if (code === 'ENOTFOUND') reason = '주소 찾기 실패';
-        else if (code === 'ECONNREFUSED') reason = '연결 거부됨';
-        else if (code === 'ECONNRESET') reason = '연결 초기화됨';
-        else if (msg.includes('invalid url') || code === 'ERR_INVALID_URL') reason = '잘못된 주소';
-        else if (msg.includes('protocol')) reason = '프로토콜 오류';
-        else if (msg.includes('cert') || msg.includes('legacy') || code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') reason = '인증서 오류 (SSL)';
-
-        else if (err.cause) {
-            const causeMsg = String(err.cause).toLowerCase();
-            if (causeMsg.includes('econnrefused')) reason = '연결 거부됨';
-            else if (causeMsg.includes('enotfound')) reason = '주소 찾기 실패';
-            else if (causeMsg.includes('socket hang up')) reason = '서버 연결 끊김';
-            else if (causeMsg.includes('cert') || causeMsg.includes('tls') || causeMsg.includes('ssl')) reason = '인증서 오류 (SSL)';
-            else if (causeMsg.includes('protocol')) reason = '프로토콜 오류';
-        }
-        else if (err.message) {
-            reason = `오류: ${err.message}`;
-        }
-
-        result = `FAIL:${reason}`;
+        result = 'OK';
+    } else {
+        // Precise Error Mapping
+        if (status === 404) result = 'FAIL:페이지 없음 (404)';
+        else if (status === 500) result = 'FAIL:서버 오류 (500)';
+        else if (status === 502) result = 'FAIL:게이트웨이 오류 (502)';
+        else if (status === 503) result = 'FAIL:서비스 점검 중 (503)';
+        else if (status === 504) result = 'FAIL:응답 시간 초과 (504)';
+        else if (status === 403) result = 'FAIL:접근 권한 없음 (403)';
+        else if (status === 400) result = 'FAIL:잘못된 요청 (400)';
+        else result = `FAIL:HTTP 오류 (${status})`;
     }
 
-    const latency = Date.now() - startTime;
-    return { status, latency, result };
+} catch (err: any) {
+    // Map network errors
+    let reason = '접속 불가';
+    const msg = (err.message || '').toLowerCase();
+    const code = (err.code || '').toUpperCase();
+
+    if (code === 'ETIMEDOUT') reason = '시간 초과';
+    else if (msg.includes('socket hang up')) reason = '서버 연결 끊김';
+    else if (code === 'ENOTFOUND') reason = '주소 찾기 실패';
+    else if (code === 'ECONNREFUSED') reason = '연결 거부됨';
+    else if (code === 'ECONNRESET') reason = '연결 초기화됨';
+    else if (msg.includes('invalid url') || code === 'ERR_INVALID_URL') reason = '잘못된 주소';
+    else if (msg.includes('protocol')) reason = '프로토콜 오류';
+    else if (msg.includes('cert') || msg.includes('legacy') || code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') reason = '인증서 오류 (SSL)';
+
+    else if (err.cause) {
+        const causeMsg = String(err.cause).toLowerCase();
+        if (causeMsg.includes('econnrefused')) reason = '연결 거부됨';
+        else if (causeMsg.includes('enotfound')) reason = '주소 찾기 실패';
+        else if (causeMsg.includes('socket hang up')) reason = '서버 연결 끊김';
+        else if (causeMsg.includes('cert') || causeMsg.includes('tls') || causeMsg.includes('ssl')) reason = '인증서 오류 (SSL)';
+        else if (causeMsg.includes('protocol')) reason = '프로토콜 오류';
+    }
+    else if (err.message) {
+        reason = `오류: ${err.message}`;
+    }
+
+    result = `FAIL:${reason}`;
+}
+
+const latency = Date.now() - startTime;
+return { status, latency, result };
 }
