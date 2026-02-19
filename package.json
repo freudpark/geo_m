@@ -9,7 +9,6 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@cloudflare/next-on-pages": "^1.13.16",
     "@types/node-fetch": "^2.6.13",
     "clsx": "^2.1.1",
     "lucide-react": "^0.564.0",
@@ -22,7 +21,6 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260214.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
