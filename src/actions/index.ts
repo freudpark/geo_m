@@ -8,19 +8,32 @@ interface DashboardTarget extends Target {
     latestLog?: LogResult;
 }
 
+import { getRequestContext } from '@cloudflare/next-on-pages';
+
 function getDB() {
-    // Local Development -> Use Mock DB
-    if (process.env.NODE_ENV === 'development') {
-        return mockDB as unknown as D1Database;
+    // 1. Try getRequestContext (Standard for Pages Plugin)
+    try {
+        const ctx = getRequestContext();
+        if (ctx.env.DB) {
+            return ctx.env.DB as unknown as D1Database;
+        }
+    } catch (e) {
+        // Ignore error if getRequestContext is not available (e.g. local dev outside of pages dev)
     }
 
-    // Cloudflare Pages -> Use D1
+    // 2. Try process.env (Fallback for some environments)
     if (process.env.DB) {
         return process.env.DB as unknown as D1Database;
     }
 
-    // Fallback (Build time or misconfiguration)
-    return mockDB as unknown as D1Database;
+    // 3. Local Development -> Use Mock DB
+    if (process.env.NODE_ENV === 'development') {
+        return mockDB as unknown as D1Database;
+    }
+
+    // 4. Production but no DB -> Throw Error (Don't use MockDB which crashes Edge)
+    console.error("CRITICAL ERROR: D1 Database binding 'DB' is missing.");
+    throw new Error("Database binding not found. Please check Cloudflare Pages settings.");
 }
 
 export async function getDashboardData(): Promise<DashboardTarget[]> {
