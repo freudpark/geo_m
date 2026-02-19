@@ -10,8 +10,9 @@ database_name = "sentinel-db"
 database_id = "e0000000-0000-0000-0000-000000000000" # Replace with actual DB ID via `wrangler d1 info sentinel-db`
 
 # [Cron Trigger]
-[triggers]
-crons = ["*/5 * * * *"] # Run every 5 minutes
+# Pages does not support [triggers] in wrangler.toml yet.
+# Use Cloudflare Dashboard -> Functions -> Scheduled Triggers if needed.
+
 
 # [Observability]
 [observability]
