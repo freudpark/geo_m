@@ -47,11 +47,88 @@ function getNextId(): number {
 }
 
 // ============================================================
+// Default Google Sheet URL (fallback for auto-sync)
+// Can be overridden via GOOGLE_SHEET_URL environment variable
+// ============================================================
+const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ba41P8uZN0IM5cqSZTUD0bUPdEu4fPasOxG1Dog2xEg/edit?usp=sharing';
+
+function getSheetUrl(): string {
+    return process.env.GOOGLE_SHEET_URL || DEFAULT_SHEET_URL;
+}
+
+// Auto-load from Google Sheets if in-memory store is empty
+// This handles Vercel cold starts and multi-instance isolation
+async function ensureDataLoaded(): Promise<void> {
+    const targets = getTargets();
+    if (targets.length > 0) return; // Already loaded
+
+    const sheetUrl = getSheetUrl();
+    if (!sheetUrl) return;
+
+    try {
+        console.log('[AutoSync] Cold start detected - loading data from Google Sheets...');
+
+        let exportUrl = sheetUrl;
+        if (sheetUrl.includes('docs.google.com/spreadsheets/d/')) {
+            const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+            if (match && match[1]) {
+                exportUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv`;
+            }
+        }
+
+        const response = await fetch(exportUrl);
+        if (!response.ok) {
+            console.error(`[AutoSync] Failed to fetch sheet: HTTP ${response.status}`);
+            return;
+        }
+
+        const csvText = await response.text();
+        const rows = parseCSV(csvText);
+        if (rows.length === 0) return;
+
+        const newTargets = rows.map((row: any) => {
+            const name = findValue(row, '홈페이지명', '사이트명', '이름', 'Name', 'Site');
+            const urlVal = findValue(row, 'URL', '주소', 'Address', 'Link');
+            const ip = findValue(row, 'IP', '아이피', 'ip');
+            const category = findValue(row, '구분', '분류', 'Category', 'Type');
+            const wasVal = findValue(row, 'WAS', 'WAS수', 'was_cnt', 'WAS Count', 'WAS목록', 'WAS서버');
+            const webVal = findValue(row, 'WEB', 'WEB수', 'web_cnt', 'WEB Count', 'WEB목록', 'WEB서버');
+
+            return {
+                id: 0, // Will be assigned below
+                name: name || 'Unknown',
+                url: urlVal,
+                was_cnt: wasVal ? parseInt(wasVal, 10) : 0,
+                web_cnt: webVal ? parseInt(webVal, 10) : 0,
+                db_info: ip || '',
+                keyword: undefined,
+                interval: 5,
+                is_active: 1,
+                category: category || '교육지원청',
+                created_at: new Date().toISOString()
+            };
+        }).filter((t: any) => t.url && (t.url.startsWith('http') || t.url.startsWith('https')));
+
+        // Assign IDs
+        newTargets.forEach((t, i) => { t.id = i + 1; });
+        setTargets(newTargets);
+        globalThis._nextTargetId = newTargets.length + 1;
+
+        console.log(`[AutoSync] Loaded ${newTargets.length} targets from Google Sheets.`);
+    } catch (e) {
+        console.error('[AutoSync] Error:', e);
+    }
+}
+
+// ============================================================
 // Server Actions
 // ============================================================
 
 export async function getDashboardData(): Promise<DashboardTarget[]> {
     try {
+        // Auto-load from Google Sheets on cold start
+        await ensureDataLoaded();
+
         const targets = getTargets().filter(t => t.is_active === 1);
         if (targets.length === 0) return [];
 
@@ -83,6 +160,9 @@ export async function getDashboardData(): Promise<DashboardTarget[]> {
 
 export async function getAllTargets(): Promise<Target[]> {
     try {
+        // Auto-load from Google Sheets on cold start
+        await ensureDataLoaded();
+
         const targets = getTargets();
         // Sort by id DESC
         return [...targets].sort((a, b) => b.id - a.id);
