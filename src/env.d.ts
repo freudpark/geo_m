@@ -1,8 +1,9 @@
-import "@cloudflare/workers-types";
+// Vercel environment - no Cloudflare-specific types needed
 
 declare global {
-    interface CloudflareEnv {
-        DB: D1Database;
-        [key: string]: unknown;
-    }
+    var _targets: import('./lib/db').Target[];
+    var _logs: import('./lib/db').LogResult[];
+    var _nextTargetId: number;
 }
+
+export { };
